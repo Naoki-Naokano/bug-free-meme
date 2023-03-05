@@ -1,0 +1,37 @@
+'''file = open('Influenza A.txt')
+a = file.read()
+file = open('Influenza B.txt')
+b = file.read()'''
+file = open('Wuhan.txt')
+a = file.read()
+file = open('Omicron.txt')
+b = file.read()
+arr11 = []
+arr21 = []
+arr12 = []
+arr22 = []
+result = ""
+
+for i in range(len(a) - 1 + 1):
+    for j in range(len(b) - 1 + 1):
+        if a[i:i + 1] == b[j:j + 1]:
+            arr11.append(i)
+            arr21.append(j)
+
+for l in range(2, len(a) + 1):
+    print(l)
+    if len(arr11) == 1:
+        break
+    for i in range(len(arr11)):
+        if a[arr11[i]:arr11[i] + l] == b[arr21[i]:arr21[i] + l]:
+            arr12.append(arr11[i])
+            arr22.append(arr21[i])
+            if len(a[arr11[i]:arr11[i] + l]) > len(result):
+                result = a[arr11[i]:arr11[i] + l]
+    arr11.clear()
+    arr21.clear()
+    arr11 = arr12.copy()
+    arr21 = arr22.copy()
+    arr12.clear()
+    arr22.clear()
+print(result)
