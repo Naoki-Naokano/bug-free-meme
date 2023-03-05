@@ -1,0 +1,20 @@
+file = open('Influenza A.txt')
+a = file.read()
+file = open('Influenza B.txt')
+b = file.read()
+file = open('Wuhan.txt')
+c = file.read()
+file = open('Omicron.txt')
+d = file.read()
+result = ""
+for l in range(10, len(a) + 1):
+    count = 0
+    for i in range(len(a) - l + 1):
+        for j in range(len(b) - l + 1):
+            if a[i:i + l] == b[j:j + l]:
+                result = a[i:i + l]
+                count += 1
+    if count == 0:
+        break
+print(result)
+
