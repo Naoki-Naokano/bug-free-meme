@@ -1,0 +1,89 @@
+<?php
+function get_next($p) {
+  $next = [
+    [$p[0] + $p[3], $p[1], $p[2], $p[3] + 1, $p[4] + 1],
+    [$p[0], $p[1] + $p[3], $p[2], $p[3] + 1, $p[4] + 1],
+    [$p[0], $p[1], $p[2] + $p[3], $p[3] + 1, $p[4] + 1]
+  ];
+  $next = nullfication($next);
+  if ($p[4] == 1) return $next;
+  if ($p[0] % 2 == 0) {
+    $next[] = [$p[0] / 2, $p[1] + $p[0] / 2, $p[2], $p[3] + 1, $p[4] + 1];
+    $next[] = [$p[0] / 2, $p[1], $p[2] + $p[0] / 2, $p[3] + 1, $p[4] + 1];
+  }
+  if ($p[1] % 2 == 0) {
+    $next[] = [$p[0] + $p[1] / 2, $p[1] / 2, $p[2], $p[3] + 1, $p[4] + 1];
+    $next[] = [$p[0], $p[1] / 2, $p[2] + $p[1] / 2, $p[3] + 1, $p[4] + 1];
+  }
+  if ($p[2] % 2 == 0) {
+    $next[] = [$p[0] + $p[2] / 2, $p[1], $p[2] / 2, $p[3] + 1, $p[4] + 1];
+    $next[] = [$p[0], $p[1] + $p[2] / 2, $p[2] / 2, $p[3] + 1, $p[4] + 1];
+  }
+
+  $next = nullfication($next);
+
+  return $next;
+}
+
+function to_win_combination($p){
+    global $if_win;
+    $if_win = false;
+    for ($i = 0; $i < Count($p); $i++){
+        if ($p[$i][0] == $p[$i][1] || $p[$i][0] == $p[$i][2] || $p[$i][1] == $p[$i][2]) {
+            $if_win = true;
+            return $p[$i];
+        }
+    }
+    return $p[0];
+}
+
+function prevent_defeat($p){
+    global $if_defeat;
+    $if_defeat = false;
+    $predict = get_next($p);
+    for ($i = 0; $i < Count($predict); $i++){
+        if ($predict[$i][0] == $predict[$i][1] || $predict[$i][0] == $predict[$i][2] || $predict[$i][1] == $predict[$i][2]) {
+            $if_defeat = true;
+            break;
+        }
+    }
+}
+
+function nullfication($next){
+    for ($i = 0; $i < Count($next); $i++){
+        if ($next[$i][3] > 3){
+            $next[$i][3] -= 3;
+        }
+    }
+    return $next;
+}
+
+$present = [1, 2, 3, 3, 1];
+for ($i = 0; $i < 5; $i++){
+    $chose = false;
+    $predict = (get_next($present));
+    print("TURN: ");
+    print_r($present);
+
+    to_win_combination($predict);
+    if ($if_win == true) {
+        $present = to_win_combination($predict);
+        $chose = true;
+        break;
+    }
+    else{
+        for ($i = 0; $i < Count($predict); $i++){
+            prevent_defeat($predict[$i]);
+            if (!$if_defeat){
+                $present = $predict[$i];
+                $chose = true;
+                break;
+            }
+        }
+        if (!$chose){
+            $present = $predict[rand(0, 2)];
+        }
+    }  
+}
+print_r($present);
+print("Finish");
