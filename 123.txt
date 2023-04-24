@@ -1,0 +1,366 @@
+#include <windows.h>
+#include <gl/gl.h>
+#include <math.h>
+#include "stb-master\stb_easy_font.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb-master\stb_image.h"
+
+int width = 1200;
+int height = 700;
+float koef;
+float gravity = 0.004;
+
+typedef struct {
+    char name[20];
+    float vert[8];
+    BOOL hover;
+    float buffer[1000];
+    float scale;
+}TButton;
+
+
+TButton btn[] = {
+    {"start", {2,2, 102,2, 102,32, 2,32}, FALSE},
+    {"stop", {112,2, 212,2, 212,32, 112,32}, FALSE},
+    {"quit", {222,2, 322,2, 322,32, 222,32}, FALSE}
+};
+int btnCnt = sizeof(btn) / sizeof(btn[0]);
+
+
+void TButton_Show(TButton btn)
+{
+    glEnableClientState(GL_VERTEX_ARRAY);
+        if (btn.hover) glColor3f(0.7, 0.7, 0);
+        else glColor3f(0,0.7,0);
+        glVertexPointer(2, GL_FLOAT, 0, btn.vert);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+        glColor3f(0.0,0.0,0.0); //цвет обводки
+        glLineWidth(2); // толщина обводки кнопки
+        glDrawArrays(GL_LINE_LOOP,0,4); //отрисовка обводки
+
+        int num_quds = stb_easy_font_print(0, 0, btn.name, 0, btn.buffer, sizeof(btn.buffer));
+        float scale = (btn.vert[5] - btn.vert[1]) / (stb_easy_font_height(btn.name));
+        float CenterX = btn.vert[2] - ((btn.vert[2] - btn.vert[0]) / 2 - 5);
+        float CenterY = btn.vert[5] - ((btn.vert[5] - btn.vert[1]) / 2 - 5);
+        float TextPosX = CenterX - (stb_easy_font_width(btn.name) * scale) / 2;
+        float TextPosY = CenterY - (stb_easy_font_height(btn.name) * scale) / 2;
+
+        glDisableClientState(GL_VERTEX_ARRAY);
+        glPushMatrix();
+        glColor3f(1,1,1); //цвет текста
+        glTranslatef(TextPosX, TextPosY, 0); //перенос матрицы для отрисовки текста
+        glScalef(scale, scale, 1); //масштабирование текста
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glVertexPointer(2, GL_FLOAT, 16, btn.buffer); //вектор для отрисовки
+        glDrawArrays(GL_QUADS, 0, num_quds*4); //отрисовка текста
+        glPopMatrix();
+    glDisableClientState(GL_VERTEX_ARRAY);
+}
+
+
+BOOL PointInButton(int x, int y, TButton btn)
+{
+    return (x > btn.vert[0]) && (x < btn.vert[4]) &&
+    (y > btn.vert[1]) && (y < btn.vert[5]);
+}
+
+
+void ShowMenu()
+{
+    glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, width, height, 0, -1, 1);
+        for (int i = 0; i < btnCnt; i++)
+            TButton_Show(btn[i]);
+    glPopMatrix();
+}
+
+void Quad(float x, float y, float dx, float dy)
+{
+    glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x, y);
+        glVertex2f(x+dx, y);
+        glVertex2f(x+dx, y+dy);
+        glVertex2f(x, y+dy);
+    glEnd();
+}
+
+
+typedef struct {
+    float x,y;
+    float dx, dy;
+    float r;
+} TBall;
+
+TBall ball;
+TBall player[2];
+float netHeight = -0.2;
+
+BOOL IsCross(float x1, float y1, float r, float x2, float y2)
+{
+    return pow(x1-x2, 2)+pow(y1-y2, 2)< r*r;
+}
+
+void TBall_Init(TBall *obj, float x1, float y1, float dx1, float dy1, float r1)
+{
+    obj->x = x1;
+    obj->y = y1;
+    obj->dx = dx1;
+    obj->dy = dy1;
+    obj->r = r1;
+}
+
+
+void TBall_Show(TBall obj)
+{
+    glPushMatrix();
+        glTranslatef(obj.x, obj.y, 0);
+        glScalef(obj.r, obj.r, 1);
+        Quad(1, 1, 1, 1);
+    glPopMatrix();
+}
+
+void Player_Move(TBall *obj, char left, char right, char jump, float wl1, float wl2)
+{
+    static float speed = 0.05;
+
+    if (GetKeyState(left) < 0) obj->x -= speed;
+    else if (GetKeyState(right) < 0) obj->x += speed;
+
+    if(obj->x - obj->r < wl1) obj->x = wl1 + obj->r;
+    if(obj->x + obj->r > wl2) obj->x = wl2 - obj->r;
+
+    if((GetKeyState(jump) < 0) && (obj->y < -0.99 + obj->r))
+        obj->dy = speed * 1.4;
+    obj -> y += obj->dy;
+    obj -> dy -= gravity;
+
+    if (obj->y - obj->r < -1)
+    {
+        obj->y = -1 + obj->r;
+        obj->dy = 0;
+    }
+}
+
+unsigned int texture;
+
+void Game_Init()
+{
+    TBall_Init(player+0, -1,0, 0,0, 0.2);
+}
+
+
+void Game_Show()
+{
+    glColor3f(0.16, 0.24, 0.29);
+    Quad(-koef, -1, koef*2, 0.5);
+    glColor3f(0.6, 0.79, 0.93);
+    Quad(-koef, -0.5, koef*2, 1.5);
+
+    glColor3f(0.52, 0.51, 0.53);
+    TBall_Show(player[0]);
+
+    /*glColor3f(0,0,0);
+    glLineWidth(8);
+    glBegin(GL_LINES);
+        glVertex2f(0, netHeight);
+        glVertex2f(0, -1);
+    glEnd();*/
+}
+
+LRESULT CALLBACK WindowProc(HWND, UINT, WPARAM, LPARAM);
+void EnableOpenGL(HWND hwnd, HDC*, HGLRC*);
+void DisableOpenGL(HWND, HDC, HGLRC);
+
+int WINAPI WinMain(HINSTANCE hInstance,
+                   HINSTANCE hPrevInstance,
+                   LPSTR lpCmdLine,
+                   int nCmdShow)
+{
+    WNDCLASSEX wcex;
+    HWND hwnd;
+    HDC hDC;
+    HGLRC hRC;
+    MSG msg;
+    BOOL bQuit = FALSE;
+    float theta = 0.0f;
+
+    /* register window class */
+    wcex.cbSize = sizeof(WNDCLASSEX);
+    wcex.style = CS_OWNDC;
+    wcex.lpfnWndProc = WindowProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+    wcex.lpszMenuName = NULL;
+    wcex.lpszClassName = "GLSample";
+    wcex.hIconSm = LoadIcon(NULL, IDI_APPLICATION);;
+
+
+    if (!RegisterClassEx(&wcex))
+        return 0;
+
+    /* create main window */
+    hwnd = CreateWindowEx(0,
+                          "GLSample",
+                          "OpenGL Sample",
+                          WS_OVERLAPPEDWINDOW,
+                          CW_USEDEFAULT,
+                          CW_USEDEFAULT,
+                          width,
+                          height,
+                          NULL,
+                          NULL,
+                          hInstance,
+                          NULL);
+
+    ShowWindow(hwnd, nCmdShow);
+
+    /* enable OpenGL for the window */
+    EnableOpenGL(hwnd, &hDC, &hRC);
+
+    koef = (float)width / height;
+    glScalef(1/koef, 1, 1);
+
+    Game_Init();
+
+    /* program main loop */
+    while (!bQuit)
+    {
+        /* check for messages */
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        {
+            /* handle or dispatch messages */
+            if (msg.message == WM_QUIT)
+            {
+                bQuit = TRUE;
+            }
+            else
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+        }
+        else
+        {
+            /* OpenGL animation code goes here */
+
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            Player_Move(player+0, 'A', 'D', 'W', -koef, koef);
+
+            Game_Show();
+
+            ShowMenu();
+
+            SwapBuffers(hDC);
+
+            Sleep (1);
+        }
+    }
+
+    /* shutdown OpenGL */
+    DisableOpenGL(hwnd, hDC, hRC);
+
+    /* destroy the window explicitly */
+    DestroyWindow(hwnd);
+
+    return msg.wParam;
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg)
+    {
+        case WM_CLOSE:
+            PostQuitMessage(0);
+        break;
+
+        case WM_LBUTTONDOWN:
+             for (int i = 0; i < btnCnt; i++)
+                if (PointInButton(LOWORD(lParam), HIWORD(lParam), btn[i]))
+                {
+                    printf("%s\n", btn[i].name);
+                    if (strcmp(btn[i].name, "quit") == 0)
+                        PostQuitMessage(0);
+                }
+        break;
+
+        case WM_MOUSEMOVE:
+            for (int i = 0; i < btnCnt; i++)
+                btn[i].hover = PointInButton(LOWORD(lParam), HIWORD(lParam), btn[i]);
+        break;
+
+        case WM_SIZE:
+            width = LOWORD(lParam);
+            height = HIWORD(lParam);
+            glViewport(0,0, width, height);
+            glLoadIdentity();
+            float k = width / (float)height;
+            glOrtho(-k,k, -1,1, -1,1);
+        break;
+
+        case WM_DESTROY:
+            return 0;
+
+        case WM_KEYDOWN:
+        {
+            switch (wParam)
+            {
+                case VK_ESCAPE:
+                    PostQuitMessage(0);
+                break;
+            }
+        }
+        break;
+
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+
+    return 0;
+}
+
+void EnableOpenGL(HWND hwnd, HDC* hDC, HGLRC* hRC)
+{
+    PIXELFORMATDESCRIPTOR pfd;
+
+    int iFormat;
+
+    /* get the device context (DC) */
+    *hDC = GetDC(hwnd);
+
+    /* set the pixel format for the DC */
+    ZeroMemory(&pfd, sizeof(pfd));
+
+    pfd.nSize = sizeof(pfd);
+    pfd.nVersion = 1;
+    pfd.dwFlags = PFD_DRAW_TO_WINDOW |
+                  PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pfd.iPixelType = PFD_TYPE_RGBA;
+    pfd.cColorBits = 24;
+    pfd.cDepthBits = 16;
+    pfd.iLayerType = PFD_MAIN_PLANE;
+
+    iFormat = ChoosePixelFormat(*hDC, &pfd);
+
+    SetPixelFormat(*hDC, iFormat, &pfd);
+
+    /* create and enable the render context (RC) */
+    *hRC = wglCreateContext(*hDC);
+
+    wglMakeCurrent(*hDC, *hRC);
+}
+
+void DisableOpenGL (HWND hwnd, HDC hDC, HGLRC hRC)
+{
+    wglMakeCurrent(NULL, NULL);
+    wglDeleteContext(hRC);
+    ReleaseDC(hwnd, hDC);
+}
+
